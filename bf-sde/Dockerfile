@@ -1,10 +1,10 @@
-FROM stratumproject/build:21.06
+#first stage build code
+FROM stratumproject/build:21.06 as builder
 
 ENV BLD_HOME=/root
 ENV SDE_TAR=bf-sde-9.9.0.tgz
 ENV SDE_PREFIX=bf-sde-9.9.0
 ENV SDE_VERSION=9.9.0
-ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${BLD_HOME}/install/bin
 
 ADD ${SDE_TAR} ${BLD_HOME}/
 
@@ -14,14 +14,22 @@ RUN find p4studio -type f -name "*.py" -exec sed -i "s/wget/wget --no-check-cert
 
 RUN cd p4studio && ./install-p4studio-dependencies.sh && ./p4studio profile apply ./profiles/all-tofino.yaml
 
-RUN mv install ../ && cd ..
+#RUN mv install /usr/local/p4 && chown -Rf root:staff /usr/local/p4 && cd ..
 
-WORKDIR ${BLD_HOME}
+#WORKDIR ${BLD_HOME}
 
-#RUN apt install -y python3-packaging
+#RUN rm -rf ${SDE_PREFIX}
 
-ENTRYPOINT ["tail"]
-CMD ["-f","/dev/null"]
 
-#ENTRYPOINT []
-#CMD ["/bin/bash"]
+#second stage copy build result
+FROM stratumproject/build:21.06
+
+ENV BLD_HOME=/root
+ENV SDE_PREFIX=bf-sde-9.9.0
+
+COPY --from=builder ${BLD_HOME}/${SDE_PREFIX}/install /usr/local/p4
+RUN chown -Rf root:root /usr/local/p4
+
+ENV PATH="$PATH:/usr/local/p4/bin"
+
+RUN apt-get update && apt-get install -y python3-packaging
